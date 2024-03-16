@@ -3,9 +3,8 @@
 import { FC, useState } from "react";
 import { useDraw } from "@/hooks/useDraw";
 import { ChromePicker } from "react-color";
-import { PageProps } from "@/.next/types/app/page";
 
-const Page: FC<PageProps> = () => {
+const Page: FC = () => {
   const [color, setColor] = useState<string>("#000");
   const { canvasRef, onMouseDown, clear } = useDraw(drawLine);
 
