@@ -1,17 +1,26 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 //passing the callback to the hook
 export const useDraw = (
   onDraw: ({ ctx, currentPoint, prevPoint }: Draw) => void
 ) => {
+  const [mouseDown, setMouseDown] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const prevPoint = useRef<null | Point>(null);
+
+  const onMouseDown = () => setMouseDown(true);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      if (!mouseDown) return;
       const currentPoint = computePointInCanvas(e);
 
       const ctx = canvasRef.current?.getContext("2d");
       if (!ctx || !currentPoint) return;
+
+      onDraw({ ctx, currentPoint, prevPoint: prevPoint.current });
+      prevPoint.current = currentPoint; // setting the current point as previous after drawing stroke
     };
 
     // get coordinates(x,y) relative to the canvas
@@ -26,12 +35,20 @@ export const useDraw = (
       return { x, y };
     };
 
+    const mouseUpHandler = () => {
+      setMouseDown(false);
+      prevPoint.current = null;
+    };
     // Add event listeners
     canvasRef.current?.addEventListener("mousemove", handler);
+    window.addEventListener("mouseup", mouseUpHandler);
 
     // Remove event listeners
-    return () => canvasRef.current?.addEventListener("mousemove", handler);
-  }, []); //empty dependency array, we want this useEffect to be executed once
+    return () => {
+      canvasRef.current?.removeEventListener("mousemove", handler);
+      window.removeEventListener("mouseup", mouseUpHandler);
+    };
+  }, [onDraw]); //Including the callback function in the dependency array ensures that the effect will re-run whenever the callback function reference or any of its dependent values change.
 
-  return { canvasRef };
+  return { canvasRef, onMouseDown };
 };
