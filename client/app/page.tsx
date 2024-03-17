@@ -1,32 +1,39 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useEffect, useState } from "react";
 import { useDraw } from "@/hooks/useDraw";
 import { ChromePicker } from "react-color";
+import { io } from "socket.io-client";
+import { drawLine } from "@/utils/drawLine";
+const socket = io("http://localhost:3001");
 
-const Page: FC = () => {
+interface PageProps {}
+
+type DrawLineProps = Draw & {
+  color: string;
+};
+
+const Page: FC<PageProps> = ({}) => {
   const [color, setColor] = useState<string>("#000");
-  const { canvasRef, onMouseDown, clear } = useDraw(drawLine);
+  const { canvasRef, onMouseDown, clear } = useDraw(createLine);
+
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+
+    socket.on(
+      "draw-line",
+      ({ prevPoint, currentPoint, color }: DrawLineProps) => {
+        if (!ctx) return;
+        drawLine({ prevPoint, currentPoint, ctx, color });
+      }
+    );
+  }, []);
 
   //object notation{} for function arguments, cuz the order of arguments won't matter in this case
   //function drawLine(prevPoint, currentPoint, ctx) -> here the order of arguments matters
-  function drawLine({ prevPoint, currentPoint, ctx }: Draw) {
-    const { x: currX, y: currY } = currentPoint;
-    const lineColor = color;
-    const lineWidth = 5;
-
-    let startPoint = prevPoint ?? currentPoint; //initializes the startPoint variable with either the prevPoint if it exists or the currentPoint if prevPoint is null or undefined. The ?? operator is the nullish coalescing operator, which returns the right-hand operand (currentPoint in this case) when the left-hand operand (prevPoint) is null or undefined.
-    ctx.beginPath(); //This line starts a new path on the canvas. Paths are used to draw shapes or lines.
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = lineColor;
-    ctx.moveTo(startPoint.x, startPoint.y); //moves the drawing cursor to the specified coordinates (startPoint.x, startPoint.y) without drawing anything.
-    ctx.lineTo(currX, currY); // draws a line from the current cursor position (set by moveTo) to the coordinates (currX, currY), effectively drawing the line.
-    ctx.stroke(); //This line actually draws the stroke (line) based on the previous settings such as color and width.
-
-    ctx.fillStyle = lineColor; //sets the fill color for shapes that will be filled on the canvas.
-    ctx.beginPath(); //starts a new path for drawing shapes.
-    ctx.arc(startPoint.x, startPoint.y, 2, 0, 2 * Math.PI); //draws a filled circle (arc) at the coordinates (startPoint.x, startPoint.y) with a radius of 2 pixels.
-    ctx.fill(); //fills the circle (arc) with the specified fill color
+  function createLine({ prevPoint, currentPoint, ctx }: Draw) {
+    socket.emit("draw-line", { prevPoint, currentPoint, color });
+    drawLine({ prevPoint, currentPoint, ctx, color });
   }
 
   return (
