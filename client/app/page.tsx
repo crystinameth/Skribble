@@ -20,6 +20,23 @@ const Page: FC<PageProps> = ({}) => {
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
 
+    socket.emit("client-ready"); //when a new client connects , get the current canvas state for him (see server logic)
+
+    socket.on("get-canvas-state", () => {
+      if (!canvasRef.current?.toDataURL()) return; //toDataURL will convert the canvas state into a URL which will be emitted to the new client added
+      //     console.log(canvasRef.current?.toDataURL())
+      socket.emit("canvas-state", canvasRef.current.toDataURL());
+    });
+
+    socket.on("canvas-state-from-server", (state: string) => {
+      console.log("I received the state");
+      const img = new Image();
+      img.src = state;
+      img.onload = () => {
+        ctx?.drawImage(img, 0, 0);
+      };
+    });
+
     socket.on(
       "draw-line",
       ({ prevPoint, currentPoint, color }: DrawLineProps) => {
@@ -27,7 +44,17 @@ const Page: FC<PageProps> = ({}) => {
         drawLine({ prevPoint, currentPoint, ctx, color });
       }
     );
-  }, []);
+
+    socket.on("clear", clear);
+
+    // clean-up , turn off the sockets
+    return () => {
+      socket.off("get-canvas-state");
+      socket.off("canvas-state-from-server");
+      socket.off("draw-line");
+      socket.off("clear");
+    };
+  }, [canvasRef]);
 
   //object notation{} for function arguments, cuz the order of arguments won't matter in this case
   //function drawLine(prevPoint, currentPoint, ctx) -> here the order of arguments matters
@@ -43,7 +70,7 @@ const Page: FC<PageProps> = ({}) => {
         <button
           type="button"
           className="p-2 rounded-md border border-black"
-          onClick={clear}
+          onClick={() => socket.emit("clear")}
         >
           Clear canvas
         </button>
